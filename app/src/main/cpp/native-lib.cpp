@@ -7,33 +7,29 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_net_nctucs_lapsap_root_1detection_11_MainActivity_isRooted(JNIEnv *env, jobject object_main) {
 
-    // busybox method
-    FILE* pipe = popen("busybox", "r");
+    FILE* file;
     char buffer[128];
-    std::string resultCmd = "";
-    if(fgets(buffer, 128, pipe) != NULL)
-        resultCmd = buffer;
-    pclose(pipe);
-    if(resultCmd != "")
-        return true;
-    // which su method
-    pipe = popen("which su", "r");
-    resultCmd = "";
-    if(fgets(buffer, 128, pipe) != NULL)
-        resultCmd = buffer;
-    pclose(pipe);
-    if(resultCmd != "")
-        return true;
-    // package manager method
-    resultCmd = "";
-    pipe = popen("pm list packages | grep supersu", "r");
-    while(!feof(pipe)) {
-        if (fgets(buffer, 128, pipe) != NULL)
-            resultCmd += buffer;
+    const std::string test_exe[] = {"busybox", "which su", "pm list packages | grep supersu"};
+    int siz = sizeof(test_exe) / sizeof(test_exe[0]);
+    for(int i=0; i<siz; i++){
+        file = popen(test_exe[i].c_str(), "r");
+        if(fgets(buffer, 128, file) != NULL) {
+            pclose(file);
+            return true;
+        }
+        pclose(file);
     }
-    pclose(pipe);
-    if(resultCmd != "")
-        return true;
+
+    // path method
+    const std::string paths[] ={"/system/app/Superuser.apk", "/sbin/su", "/system/bin/su", "/system/xbin/su", "/data/local/xbin/su",
+                                "/data/local/bin/su", "/system/sd/xbin/su", "/system/bin/failsafe/su", "/data/local/su", "/su/bin/su"};
+    siz = sizeof(paths) / sizeof(paths[0]) ;
+    for(int i=0; i<siz; i++){
+        if(FILE *file = fopen(paths[i].c_str(), "r")) {
+            fclose(file);
+            return true;
+        }
+    }
 
     // build tag method text = android.os.Build.TAGS;
     jclass class_build = env->FindClass("android/os/Build");
@@ -43,16 +39,7 @@ Java_net_nctucs_lapsap_root_1detection_11_MainActivity_isRooted(JNIEnv *env, job
     if( string_build != "release-keys" )
         return true;
 
-    // path method
-    const std::string paths[] ={"/system/app/Superuser.apk", "/sbin/su", "/system/bin/su", "/system/xbin/su", "/data/local/xbin/su",
-                                "/data/local/bin/su", "/system/sd/xbin/su", "/system/bin/failsafe/su", "/data/local/su", "/su/bin/su"};
-    int siz = sizeof(paths) / sizeof(paths[0]) ;
-    for(int i=0; i<siz; i++){
-        if(FILE *file = fopen(paths[i].c_str(), "r")) {
-            fclose(file);
-            return true;
-        }
-    }
+
 
     return false;
 }
